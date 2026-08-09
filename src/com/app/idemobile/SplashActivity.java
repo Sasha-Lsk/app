@@ -34,9 +34,7 @@ public class SplashActivity extends Activity {
 
         View root = findViewById(R.id.splash_image);
         if (root != null) {
-            root.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
+            root.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
         }
 
         handler.postDelayed(go, SPLASH_MS);
@@ -62,9 +60,7 @@ public class SplashActivity extends Activity {
             window.setNavigationBarColor(Color.TRANSPARENT);
         }
 
-        int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
+        int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE;
         if (Build.VERSION.SDK_INT >= 26) {
             flags &= ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
         }

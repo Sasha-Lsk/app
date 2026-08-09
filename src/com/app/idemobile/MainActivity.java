@@ -72,7 +72,7 @@ public class MainActivity extends Activity {
     }
 
 
-    /** Делает системные панели прозрачными, чтобы WebView занимал весь экран. */
+    /** Делает системные панели прозрачными без растягивания WebView под них. */
     private void makeSystemBarsTransparent() {
         Window window = getWindow();
         if (window == null) return;
@@ -85,9 +85,7 @@ public class MainActivity extends Activity {
             window.setNavigationBarColor(Color.TRANSPARENT);
         }
 
-        int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
+        int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE;
         if (Build.VERSION.SDK_INT >= 26) {
             flags &= ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
         }
