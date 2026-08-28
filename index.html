@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>V2Ray URL Converter</title>
+  <style>
+    :root { color-scheme: dark; --bg:#08111f; --panel:rgba(17,31,52,.86); --line:#29415f; --text:#edf5ff; --muted:#9db0ca; --accent:#72e5c2; --blue:#7aa9ff; --danger:#ff8a9d; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; font:15px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; color:var(--text); background:radial-gradient(circle at 12% 0%, #1c3964 0, transparent 30rem), radial-gradient(circle at 90% 15%, #174b4f 0, transparent 28rem), var(--bg); }
+    main { width:min(1120px, calc(100% - 32px)); margin:auto; padding:52px 0 34px; }
+    .eyebrow { color:var(--accent); letter-spacing:.12em; text-transform:uppercase; font-size:.73rem; font-weight:800; }
+    h1 { font-size:clamp(2rem, 5vw, 3.6rem); letter-spacing:-.055em; line-height:1; margin:10px 0 16px; max-width:800px; }
+    .intro { max-width:720px; color:var(--muted); margin:0 0 34px; font-size:1.02rem; }
+    .grid { display:grid; grid-template-columns:1fr; gap:20px; }
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:20px; overflow:hidden; box-shadow:0 18px 60px rgba(0,0,0,.2); }
+    .card-head { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:18px 20px 12px; }
+    h2 { font-size:1rem; margin:0; letter-spacing:-.01em; }
+    .hint, #status { color:var(--muted); font-size:.82rem; margin:4px 20px 12px; }
+    textarea { display:block; width:calc(100% - 40px); min-height:242px; margin:0 20px 20px; padding:16px; resize:vertical; border:1px solid #35506f; border-radius:13px; outline:none; background:#07101d; color:#dceaff; font:12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; transition:border .2s, box-shadow .2s; }
+    textarea:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(114,229,194,.13); }
+    #output { min-height:280px; color:#d8fff3; }
+    .actions { display:flex; flex-wrap:wrap; gap:10px; padding:0 20px 20px; }
+    button, .file-button { appearance:none; display:inline-flex; align-items:center; justify-content:center; gap:8px; border:1px solid #45617f; border-radius:10px; padding:10px 14px; cursor:pointer; color:var(--text); background:#14253b; font:inherit; font-weight:700; transition:transform .15s, background .15s, border .15s; }
+    button:hover, .file-button:hover { transform:translateY(-1px); background:#203b5c; border-color:#6289b2; }
+    button.primary { border-color:transparent; color:#062019; background:var(--accent); }
+    button.primary:hover { background:#a0f1d9; }
+    button.subtle { color:var(--muted); }
+    .file-button input { display:none; }
+    #status { min-height:1.3em; margin:0; padding:0 20px 18px; }
+    #status.ok { color:var(--accent); } #status.error { color:var(--danger); }
+    .footer { margin-top:22px; color:var(--muted); font-size:.8rem; text-align:center; }
+    @media (max-width:600px) { main { width:min(100% - 20px, 1120px); padding-top:28px; } .card-head { align-items:flex-start; flex-direction:column; } textarea { width:calc(100% - 24px); margin:0 12px 14px; } .actions, #status { padding-left:12px; padding-right:12px; } .hint { margin-left:12px; margin-right:12px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">Offline · no upload</div>
+    <h1>Превратите JSON-конфиги<br>в готовые V2Ray URL</h1>
+    <p class="intro">Вставьте XML, JSON или файл приложения. Конвертер найдёт вложенные конфигурации VLESS, VMess, Trojan и Shadowsocks и соберёт ссылки, готовые для импорта.</p>
+    <section class="grid" aria-label="Конвертер конфигураций">
+      <article class="card">
+        <div class="card-head"><h2>1. Исходные данные</h2><label class="file-button">↥ Загрузить файл<input id="file" type="file" accept=".xml,.json,.txt,text/*,application/json,application/xml"></label></div>
+        <p class="hint">Поддерживаются XML с JSON в полях, обычный JSON и массивы конфигураций.</p>
+        <textarea id="source" spellcheck="false" placeholder="Вставьте сюда содержимое XML/JSON или выберите файл…" aria-label="Исходный XML или JSON"></textarea>
+      </article>
+      <article class="card">
+        <div class="card-head"><h2>2. Стандартные URL</h2><span id="count" class="hint">Пока пусто</span></div>
+        <textarea id="output" spellcheck="false" placeholder="Результат появится здесь — его можно отредактировать перед копированием или скачиванием." aria-label="Список URL конфигураций"></textarea>
+        <div class="actions"><button id="convert" class="primary">✦ Конвертировать</button><button id="copy">⧉ Копировать</button><button id="clear" class="subtle">Очистить</button><button id="download">↓ Скачать .txt</button></div>
+        <p id="status" role="status" aria-live="polite"></p>
+      </article>
+    </section>
+    <p class="footer">Обработка выполняется только в браузере — исходный файл никуда не отправляется.</p>
+  </main>
+  <script>
+    const $ = (selector) => document.querySelector(selector);
+    const source = $('#source'), output = $('#output'), status = $('#status'), count = $('#count');
+    const enc = (value) => encodeURIComponent(value);
+    const query = (parameters) => Object.entries(parameters).filter(([, value]) => value !== undefined && value !== null && value !== '').map(([key, value]) => `${enc(key)}=${enc(String(value)).replace(/%2F/g, '/')}`).join('&');
+    const nameFor = (context, number) => `${String(number).padStart(3, '0')} ${[context.transfers, context.fellow, context.voice].filter(Boolean).join(' ') || 'Imported config'}`;
+
+    function streamParameters(stream = {}) {
+      const network = stream.network || 'tcp', security = stream.security || 'none';
+      const result = { security, type: network };
+      if (security === 'reality') {
+        const reality = stream.realitySettings || {};
+        Object.assign(result, { sni: reality.serverName, fp: reality.fingerprint, pbk: reality.publicKey, sid: reality.shortId, spx: reality.spiderX });
+      }
+      if (security === 'tls') {
+        const tls = stream.tlsSettings || {};
+        Object.assign(result, { sni: tls.serverName, fp: tls.fingerprint, alpn: Array.isArray(tls.alpn) ? tls.alpn.join(',') : tls.alpn });
+      }
+      if (network === 'ws') {
+        const ws = stream.wsSettings || {};
+        Object.assign(result, { host: ws.host || (ws.headers || {}).Host, path: ws.path });
+      } else if (network === 'grpc') {
+        const grpc = stream.grpcSettings || {};
+        Object.assign(result, { serviceName: grpc.serviceName, mode: grpc.multiMode ? 'multi' : undefined });
+      } else if (network === 'xhttp') {
+        const xhttp = stream.xhttpSettings || {};
+        Object.assign(result, { host: xhttp.host, path: xhttp.path, mode: xhttp.mode, xPaddingBytes: (xhttp.extra || {}).xPaddingBytes });
+      }
+      return result;
+    }
+
+    function vless(config, context, number) {
+      const server = config.settings.vnext[0], user = server.users[0];
+      const parameters = { encryption: user.encryption || 'none', flow: user.flow, ...streamParameters(config.streamSettings) };
+      return `vless://${enc(user.id)}@${server.address}:${server.port}?${query(parameters)}#${enc(nameFor(context, number))}`;
+    }
+    function shadowsocks(config, context, number) {
+      const settings = (config.settings.servers || [config.settings])[0];
+      const credential = btoa(unescape(encodeURIComponent(`${settings.method}:${settings.password}`))).replace(/=+$/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+      return `ss://${credential}@${settings.address}:${settings.port}${settings.uot ? '?uot=1' : ''}#${enc(nameFor(context, number))}`;
+    }
+    function trojan(config, context, number) {
+      const server = (config.settings.servers || [config.settings])[0];
+      return `trojan://${enc(server.password)}@${server.address}:${server.port}?${query(streamParameters(config.streamSettings))}#${enc(nameFor(context, number))}`;
+    }
+    function vmess(config, context, number) {
+      const server = config.settings.vnext[0], user = server.users[0], stream = config.streamSettings || {}, ws = stream.wsSettings || {}, tls = stream.tlsSettings || {};
+      const payload = { v:'2', ps:nameFor(context, number), add:server.address, port:String(server.port), id:user.id, aid:String(user.alterId || 0), scy:user.security || 'auto', net:stream.network || 'tcp', type:'none', host:ws.host || (ws.headers || {}).Host || '', path:ws.path || '', tls:stream.security || '', sni:tls.serverName || '', fp:tls.fingerprint || '' };
+      return `vmess://${btoa(unescape(encodeURIComponent(JSON.stringify(payload))))}`;
+    }
+    const converters = { vless, vmess, trojan, shadowsocks, ss: shadowsocks };
+
+    function parseInput(text) {
+      const xml = new DOMParser().parseFromString(text, 'application/xml');
+      if (!xml.querySelector('parsererror') && xml.documentElement.nodeName !== 'parsererror') {
+        const values = [...xml.querySelectorAll('string')].map((node) => node.textContent.trim()).filter(Boolean);
+        if (values.length) return values.map((value) => { try { return JSON.parse(value); } catch { return null; } }).filter(Boolean);
+      }
+      return [JSON.parse(text)];
+    }
+    function extract(value, context = {}, found = []) {
+      if (Array.isArray(value)) value.forEach((item) => extract(item, context, found));
+      else if (value && typeof value === 'object') {
+        const next = { ...context, ...Object.fromEntries(['transfers','hits','fellow','voice','remark','ps'].filter((key) => value[key]).map((key) => [key, value[key]])) };
+        let protocol = typeof value.follow === 'string' ? value.follow.toLowerCase() : value.protocol?.toLowerCase();
+        let config = value.soon;
+        if (typeof config === 'string') { try { config = JSON.parse(config); } catch { config = null; } }
+        if (protocol && config && converters[protocol]) found.push({ protocol, config, context: next });
+        else if (protocol && value.settings && converters[protocol]) found.push({ protocol, config: value, context: next });
+        Object.values(value).forEach((item) => extract(item, next, found));
+      }
+      return found;
+    }
+    function setStatus(message, type = '') { status.textContent = message; status.className = type; }
+    function convert() {
+      try {
+        const entries = parseInput(source.value.trim()).flatMap((item) => extract(item));
+        if (!entries.length) throw new Error('Конфигурации не найдены. Проверьте, что в JSON есть поля follow/soon или protocol/settings.');
+        const urls = entries.map((entry, index) => converters[entry.protocol](entry.config, entry.context, index + 1));
+        output.value = urls.join('\n'); count.textContent = `${urls.length} URL готово`;
+        setStatus(`Готово: найдено и преобразовано ${urls.length} конфигураций.`, 'ok');
+      } catch (error) { setStatus(`Не удалось конвертировать: ${error.message}`, 'error'); }
+    }
+    $('#file').addEventListener('change', async (event) => { const file = event.target.files[0]; if (file) { source.value = await file.text(); setStatus(`Загружен файл «${file.name}». Нажмите «Конвертировать».`, 'ok'); } });
+    $('#convert').addEventListener('click', convert);
+    $('#copy').addEventListener('click', async () => { if (!output.value) return setStatus('Сначала получите список URL.', 'error'); try { await navigator.clipboard.writeText(output.value); setStatus('Список URL скопирован в буфер обмена.', 'ok'); } catch { output.select(); document.execCommand('copy'); setStatus('Список URL скопирован в буфер обмена.', 'ok'); } });
+    $('#clear').addEventListener('click', () => { source.value = ''; output.value = ''; count.textContent = 'Пока пусто'; setStatus(''); source.focus(); });
+    $('#download').addEventListener('click', () => { if (!output.value) return setStatus('Сначала получите список URL.', 'error'); const link = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([output.value + '\n'], {type:'text/plain;charset=utf-8'})), download:'v2ray-urls.txt' }); link.click(); URL.revokeObjectURL(link.href); setStatus('Файл v2ray-urls.txt подготовлен к скачиванию.', 'ok'); });
+  </script>
+</body>
+</html>
